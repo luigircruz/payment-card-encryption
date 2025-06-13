@@ -1,10 +1,23 @@
-import type { CardDetails, EncryptedCardPayload } from "@/types/payment";
+import { CardDetails, EncryptedCardPayload } from "@/types/payment";
+import crypto from "crypto";
 
-// --- Configuration ---
-const RSA_ALGORITHM_CONFIG = {
-  name: "RSA-OAEP",
-  hash: "SHA-512",
-};
+/**
+ * Encodes data into a Base64 string.
+ * If the input is a Buffer, it's converted directly.
+ * If the input is a string, it's first converted to a Buffer using UTF-8
+ * encoding, then to Base64.
+ *
+ * @param data The data to encode, either as a Buffer or a string.
+ * @returns A Base64 encoded string.
+ */
+export function toBase64(data: Buffer | string): string {
+  if (Buffer.isBuffer(data)) {
+    // If it's already a buffer, just encode it
+    return data.toString("base64");
+  }
+  // If it's a string, convert it to a buffer first, then encode
+  return Buffer.from(data, "utf8").toString("base64");
+}
 
 // --- Browser-Only Helper Functions ---
 function pemToBuffer(pem: string): ArrayBuffer {
@@ -20,16 +33,6 @@ function pemToBuffer(pem: string): ArrayBuffer {
     bytes[i] = binaryString.charCodeAt(i);
   }
   return bytes.buffer;
-}
-
-function bufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  // This uses a browser-only API
-  return window.btoa(binary);
 }
 
 // --- Client-Side Logic ---
@@ -64,23 +67,25 @@ const getImportedPublicKey = (() => {
 })();
 
 /**
- * Encrypts a single string value.
- * @param value The string to encrypt.
- * @returns A Base64-encoded string of the encrypted data.
+ * Encrypts data using an RSA public key.
+ * @param {string} plaintext - The data to encrypt.
+ * @returns {string} The encrypted data.
  */
-async function encryptFieldValue(value: string): Promise<string> {
-  const publicKey = await getImportedPublicKey();
-  const dataToEncrypt = new TextEncoder().encode(value);
+export const encrypt = (plaintext: string): string => {
+  const dataBuffer = Buffer.from(plaintext);
 
-  const encryptedBuffer = await window.crypto.subtle.encrypt(
-    RSA_ALGORITHM_CONFIG, // Using the name from the shared config
-    publicKey,
-    dataToEncrypt
+  // const encryptedData = crypto.publicEncrypt(
+  //   "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAhuAx2cpMF30b8gvzIuPoFM5G5LMZaqHTOvMItmCazq6OYNHfB4b0cy+4FF/vcIviGAtOQFitdcik5VbFdGiLGuHseN1y98Li6u6RI2oAvBNWZEifUxpEdVV09zHADSEfJo2iGb1sUe+XRx2RmPutQTmyeg6Edlor+C3AnrNW8fkYCMY7U1dgXzx2B9aAMGRtHIwMqp07NqKIiUpzh6EMELTxeJFCW0TfDH9QHN08cs+UO7r32gTBAGk7KpX4ekkBjfmB5+36vMl1/3pKP8N6/MonqhHu8LT9W36otOHlBmQ3dK0TUUzCSfMSYGubkP/dT+2UQvTPykDrAEGSYPLMGQIDAQAB\n-----END PUBLIC KEY-----",
+  //   dataBuffer
+  // );
+  const encryptedData: Buffer = crypto.publicEncrypt(
+    {
+      key: "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAhuAx2cpMF30b8gvzIuPoFM5G5LMZaqHTOvMItmCazq6OYNHfB4b0cy+4FF/vcIviGAtOQFitdcik5VbFdGiLGuHseN1y98Li6u6RI2oAvBNWZEifUxpEdVV09zHADSEfJo2iGb1sUe+XRx2RmPutQTmyeg6Edlor+C3AnrNW8fkYCMY7U1dgXzx2B9aAMGRtHIwMqp07NqKIiUpzh6EMELTxeJFCW0TfDH9QHN08cs+UO7r32gTBAGk7KpX4ekkBjfmB5+36vMl1/3pKP8N6/MonqhHu8LT9W36otOHlBmQ3dK0TUUzCSfMSYGubkP/dT+2UQvTPykDrAEGSYPLMGQIDAQAB\n-----END PUBLIC KEY-----",
+    },
+    dataBuffer
   );
-  const encryptedValue = bufferToBase64(encryptedBuffer);
-
-  return `ENC_CARD_${encryptedValue}`;
-}
+  return `ENC_CARD_${toBase64(encryptedData)}`;
+};
 
 /**
  * Encrypts each field of the card details object individually.
@@ -92,10 +97,10 @@ export async function encryptCardFieldsIndividually(
 ): Promise<Omit<EncryptedCardPayload, "ts">> {
   // Note the performance impact: this runs 4 separate, slow RSA operations.
   const [CC_PAN, CC_CVV2, CC_MONTH, CC_YEAR] = await Promise.all([
-    encryptFieldValue(cardDetails.pan),
-    encryptFieldValue(cardDetails.cvc),
-    encryptFieldValue(cardDetails.exp_month),
-    encryptFieldValue(cardDetails.exp_year),
+    encrypt(cardDetails.pan),
+    encrypt(cardDetails.cvc),
+    encrypt(cardDetails.exp_month),
+    encrypt(cardDetails.exp_year),
   ]);
 
   return {

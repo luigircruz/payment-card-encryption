@@ -7,10 +7,10 @@ interface SuccessResponse {
 }
 
 // Assume these are your variables
-const amount = "1";
-const merchantID = "SB_metromarttech";
+const amount = "1.10";
+const merchantID = "metromarttech_Dev";
 const referenceNumber = "user-12345";
-const verifykey = "8f781073bc82fc22c3c1ace6f714874c"; // This should be an environment variable!
+const verifykey = "366e26f4e3163c7e458a48b06da0fd59"; // This should be an environment variable!
 
 // 1. Concatenate the strings in the exact same order.
 const stringToHash = `${amount}${merchantID}${referenceNumber}${verifykey}`;
@@ -28,35 +28,41 @@ export async function POST(
 
     console.log({ payload, signature });
 
-    const formData = new FormData();
+    const requestData = {
+      MerchantID: merchantID,
+      ReferenceNo: referenceNumber,
+      TxnType: "SALS",
+      TxnChannel: "CREDITAN",
+      TxnCurrency: "PHP",
+      TxnAmount: amount,
+      Signature: signature,
+      CustName: "RMS Demo",
+      CustEmail: "demo@RMS.com",
+      CustContact: "09378829882",
+      CustDesc: "testing by RMS",
+      ReturnURL: "http://localhost:3000/fiuu/payments/success",
+      FailedURL: "http://localhost:3000/fiuu/payments/failed",
+      NotificationURL:
+        "http://localhost:3000/api/v2/fiuu/webhooks/notification-url",
+      CallbackURL: "http://localhost:3000/api/v2/fiuu/webhooks/callback-url",
+      ...payload,
+    };
 
-    // 2. Append each key-value pair to the FormData object
-    formData.append("MerchantID", "SB_metromarttech");
-    formData.append("ReferenceNo", referenceNumber);
-    formData.append("TxnType", "SALS");
-    formData.append("TxnChannel", "CREDITAN");
-    formData.append("TxnCurrency", "PHP");
-    formData.append("TxnAmount", "1");
-    formData.append("Signature", "3f3cf67c9956f9093643960c355b84d1");
-    formData.append("ReturnURL", "http://localhost:3000/fiuu/payments/success");
-    formData.append("FailedURL", "http://localhost:3000/fiuu/payments/failed");
-    formData.append(
-      "NotificationURL",
-      "http://localhost:3001/api/v2/fiuu/webhooks/notification-url"
-    );
-    formData.append(
-      "CallbackURL",
-      "http://localhost:3000/api/v2/fiuu/webhooks/callback-url"
-    );
-    formData.append("CC_PAN", payload.CC_PAN);
-    formData.append("CC_CVV2", payload.CC_CVV2);
-    formData.append("CC_MONTH", payload.CC_MONTH);
-    formData.append("CC_YEAR", payload.CC_YEAR);
+    const formData = new FormData();
+    for (const [key, value] of Object.entries(requestData)) {
+      // This check prevents sending fields with null or undefined values
+      if (value !== null && value !== undefined) {
+        formData.append(key, String(value));
+      }
+    }
 
     const fiuuResponse = await fetch(
-      "https://sandbox.merchant.razer.com/RMS/API/Direct/1.4.0/index.php",
+      "https://pay.fiuu.com/RMS/API/Direct/1.4.0/index.php",
       {
         method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
         body: formData,
       }
     );
