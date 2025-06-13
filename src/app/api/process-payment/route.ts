@@ -1,5 +1,3 @@
-// src/app/api/process-payment/route.ts
-
 import type { EncryptedCardPayload, ErrorResponse } from "@/types/payment";
 import { createHash } from "crypto";
 import { NextResponse } from "next/server";
@@ -19,12 +17,6 @@ const stringToHash = `${amount}${merchantID}${referenceNumber}${verifykey}`;
 
 const signature = createHash("md5").update(stringToHash).digest("hex");
 
-// const stringToSign = `${amount}${merchantID}${referenceNumber}`;
-
-// const signature = createHmac("sha512", verifykey)
-//   .update(stringToSign)
-//   .digest("hex");
-
 export async function POST(
   request: Request
 ): Promise<NextResponse<SuccessResponse | ErrorResponse>> {
@@ -35,9 +27,6 @@ export async function POST(
     }
 
     console.log({ payload, signature });
-
-    // All the complex logic is now in one function call
-    // const cardDetails = await decryptCardFieldsIndividually(payload);
 
     const formData = new FormData();
 
@@ -73,6 +62,14 @@ export async function POST(
     );
 
     const fiuuResponseJson = await fiuuResponse.json();
+    if (!fiuuResponse.ok) {
+      return NextResponse.json(
+        {
+          error: `Failed to process payment data: ${payload.CC_PAN.slice(-4)}`,
+        },
+        { status: 500 }
+      );
+    }
 
     console.log({ fiuuResponseJson });
 
@@ -89,9 +86,6 @@ export async function POST(
       )} received.`,
       response: fiuuResponseJson,
     });
-    // return NextResponse.json({
-    //   message: "Success",
-    // });
   } catch (err: unknown) {
     console.error("Decryption failed:", err);
     const message =

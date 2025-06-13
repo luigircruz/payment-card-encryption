@@ -1,9 +1,9 @@
-import ManualPaymentForm from "./components/manual-payment-form";
+import PaymentForm from "./components/payment-form";
 
 export default function Home() {
   return (
     <div>
-      <ManualPaymentForm />
+      <PaymentForm />
     </div>
   );
 }
